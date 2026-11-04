@@ -1,6 +1,6 @@
 [project]
 name = "takibi-swagger-ui"
-version = "0.1.1"
+version = "0.1.2"
 description = "Swagger UI middleware for a takibiapi app"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
     "Typing :: Typed",
 ]
-dependencies = ["takibiapi>=0.1.0,<0.2"]
+dependencies = ["takibiapi>=0.1.0,<0.3"]
 
 [project.urls]
 Repository = "https://github.com/nakita628/takibiapi"
