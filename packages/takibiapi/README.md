@@ -49,6 +49,19 @@ curl localhost:8000/takibi           # {"message":"takibi🔥"}
 
 A route is a class made with `createRoute`, and its handler takes `c: Context[thatRoute]`. `app.openapi(route, handler)` raises `TypeError` for anything else, and the type checker sees the route's types: `c.req.valid(...)` is the declared request type and `c.json(...)` takes only the declared responses.
 
+The response's status is typed too. `c.json`, `c.text` and `c.body` take only a status the route declares (200 when none is given, so a route without 200 must name its status), and the handler must return what they build (a `TypedResponse`):
+
+```python
+"responses": {201: {...Todo}, 404: {...Problem}}
+
+return c.json(Todo(...), 201)      # ok
+return c.json(Todo(...), 200)      # type error: 200 is not declared
+return c.body(status=204)          # type error: nor 204
+return Response(b"...")            # type error at app.openapi: not a declared response
+```
+
+A `"default"` response allows any status. The statuses are inferred from the literal keys, so annotate shared responses with theirs: `errors: Mapping[Literal[400, 404], ResponseConfig[Problem]]`, spread as `{**errors, 200: ...}` (a `dict[int, ...]` is a type error). Which body goes with which status is not checked: `c.json(Todo(...), 404)` passes when both are declared.
+
 ## Requests
 
 The request parts in `request` (`params`, `query`, `headers`, `cookies`, a JSON `body`) are checked against their **types** before the handler runs and read with `c.req.valid("param" | "query" | "header" | "cookie" | "json")`:

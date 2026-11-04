@@ -24,6 +24,7 @@ _Q = TypeVar("_Q")
 _J = TypeVar("_J")
 _H = TypeVar("_H")
 _B = TypeVar("_B")
+_S = TypeVar("_S")
 
 JSON_TYPE = "application/json"
 PROBLEM_JSON = "application/problem+json"
@@ -52,7 +53,15 @@ class Response:
         return self.body.decode()
 
     def __repr__(self) -> str:
-        return f"Response({self.status}, {self.body[:60]!r})"
+        return f"{type(self).__name__}({self.status}, {self.body[:60]!r})"
+
+
+class TypedResponse(Response):
+    """A response built by ``c.json`` / ``c.text`` / ``c.body``, whose status the type checker has
+    matched against the route's responses. A handler registered with ``app.openapi`` must return
+    one, so a ``Response`` built by hand is a type error there."""
+
+    __slots__ = ()
 
 
 def problem(status: int, title: str, detail: str, instance: str, type_: str = "about:blank", **extra: Any) -> Response:
@@ -118,13 +127,13 @@ class Request(Generic[TR]):
 
     # The checked part's type comes from the route: Route[params, query, json, headers, ...].
     @overload
-    def valid(self: Request[Route[_P, Any, Any, Any, Any]], target: Literal["param"]) -> _P: ...
+    def valid(self: Request[Route[_P, Any, Any, Any, Any, Any]], target: Literal["param"]) -> _P: ...
     @overload
-    def valid(self: Request[Route[Any, _Q, Any, Any, Any]], target: Literal["query"]) -> _Q: ...
+    def valid(self: Request[Route[Any, _Q, Any, Any, Any, Any]], target: Literal["query"]) -> _Q: ...
     @overload
-    def valid(self: Request[Route[Any, Any, _J, Any, Any]], target: Literal["json"]) -> _J: ...
+    def valid(self: Request[Route[Any, Any, _J, Any, Any, Any]], target: Literal["json"]) -> _J: ...
     @overload
-    def valid(self: Request[Route[Any, Any, Any, _H, Any]], target: Literal["header"]) -> _H: ...
+    def valid(self: Request[Route[Any, Any, Any, _H, Any, Any]], target: Literal["header"]) -> _H: ...
     @overload
     def valid(self, target: Literal["cookie"]) -> Any: ...
 
@@ -245,15 +254,30 @@ class Context(Generic[TR]):
         self._vars: dict[str, Any] | None = None
         self._responses = responses  # {status: {media type: encoder}}: checked responses
 
+    # ``value`` is one of the route's response bodies, and ``status`` one of its statuses (any status
+    # when the route declares "default"). A status left out is 200, so it must be declared too.
+    @overload
     def json(
-        self: Context[Route[Any, Any, Any, Any, _B]],
+        self: Context[Route[Any, Any, Any, Any, _B, Literal["default"]]],
         value: _B,
         status: int = 200,
         headers: Mapping[str, str] | None = None,
-    ) -> Response:
-        """A JSON response. ``value`` is typed by the route's responses (for the type checker).
-        With takibi's own schemas it is written as it is; schemas that check responses
-        (``pydantic-takibiapi``) raise :class:`ResponseValidationError` when it does not match."""
+    ) -> TypedResponse: ...
+    @overload
+    def json(
+        self: Context[Route[Any, Any, Any, Any, _B, _S]],
+        value: _B,
+        status: _S = 200,
+        headers: Mapping[str, str] | None = None,
+    ) -> TypedResponse: ...
+
+    def json(
+        self: Context[Any], value: Any, status: Any = 200, headers: Mapping[str, str] | None = None
+    ) -> TypedResponse:
+        """A JSON response. ``value`` and ``status`` are typed by the route's responses (for the
+        type checker). With takibi's own schemas it is written as it is; schemas that check
+        responses (``pydantic-takibiapi``) raise :class:`ResponseValidationError` when it does not
+        match."""
         if self._responses is not None:
             encoders = self._responses.get(status)
             if encoders:
@@ -271,11 +295,47 @@ class Context(Generic[TR]):
                     return self._respond(body, status, headers, JSON_TYPE)
         return self._respond(dumps(value), status, headers, JSON_TYPE)
 
-    def text(self, text: str, status: int = 200, headers: Mapping[str, str] | None = None) -> Response:
+    @overload
+    def text(
+        self: Context[Route[Any, Any, Any, Any, Any, Literal["default"]]],
+        text: str,
+        status: int = 200,
+        headers: Mapping[str, str] | None = None,
+    ) -> TypedResponse: ...
+    @overload
+    def text(
+        self: Context[Route[Any, Any, Any, Any, Any, _S]],
+        text: str,
+        status: _S = 200,
+        headers: Mapping[str, str] | None = None,
+    ) -> TypedResponse: ...
+
+    def text(
+        self: Context[Any], text: str, status: Any = 200, headers: Mapping[str, str] | None = None
+    ) -> TypedResponse:
+        """A ``text/plain`` response, with a status the route declares."""
         return self._respond(text.encode(), status, headers, "text/plain; charset=utf-8")
 
-    def body(self, data: bytes = b"", status: int = 200, headers: Mapping[str, str] | None = None) -> Response:
-        """Raw bytes (``c.body(status=204)`` for no content); set the content type in ``headers``."""
+    @overload
+    def body(
+        self: Context[Route[Any, Any, Any, Any, Any, Literal["default"]]],
+        data: bytes = b"",
+        status: int = 200,
+        headers: Mapping[str, str] | None = None,
+    ) -> TypedResponse: ...
+    @overload
+    def body(
+        self: Context[Route[Any, Any, Any, Any, Any, _S]],
+        data: bytes = b"",
+        status: _S = 200,
+        headers: Mapping[str, str] | None = None,
+    ) -> TypedResponse: ...
+
+    def body(
+        self: Context[Any], data: bytes = b"", status: Any = 200, headers: Mapping[str, str] | None = None
+    ) -> TypedResponse:
+        """Raw bytes (``c.body(status=204)`` for no content), with a status the route declares; set
+        the content type in ``headers``."""
         return self._respond(data, status, headers, None)
 
     def header(self, name: str, value: str | None, *, append: bool = False) -> None:
@@ -308,10 +368,10 @@ class Context(Generic[TR]):
 
     def _respond(
         self, payload: bytes, status: int, headers: Mapping[str, str] | None, content_type: str | None
-    ) -> Response:
+    ) -> TypedResponse:
         merged: dict[str, HeaderValue] = {} if content_type is None else {"content-type": content_type}
         if self._headers:
             merged.update(self._headers)
         if headers:
             merged.update({k.lower(): v for k, v in headers.items()})
-        return Response(payload, status, merged)
+        return TypedResponse(payload, status, merged)

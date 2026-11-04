@@ -1,5 +1,12 @@
 # zopy-takibiapi
 
+## 0.3.0
+
+### Minor Changes
+
+- Require takibiapi 0.2: typed response statuses (`c.json(..., status)` takes only a status the route declares, and handlers return a `TypedResponse`)
+- Export `StatusCode` and `TypedResponse`
+
 ## 0.2.0
 
 ### Minor Changes

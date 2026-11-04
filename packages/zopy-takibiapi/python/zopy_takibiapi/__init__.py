@@ -22,6 +22,8 @@ from takibiapi import (
     ResponseValidationError,
     Route,
     RouteConfig,
+    StatusCode,
+    TypedResponse,
     ValidationError,
     createRoute,
     problem,
@@ -44,7 +46,9 @@ __all__ = [
     "ResponseValidationError",
     "Route",
     "RouteConfig",
+    "StatusCode",
     "TakibiAPI",
+    "TypedResponse",
     "ValidationError",
     "ValidationErrorItem",
     "ValidationProblem",
@@ -53,4 +57,4 @@ __all__ = [
     "problem",
     "z",
 ]
-__version__ = "0.2.0"
+__version__ = "0.3.0"
