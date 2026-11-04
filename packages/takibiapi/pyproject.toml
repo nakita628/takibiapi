@@ -25,6 +25,7 @@ dependencies = []
 [project.urls]
 Repository = "https://github.com/nakita628/takibiapi"
 Issues = "https://github.com/nakita628/takibiapi/issues"
+Funding = "https://github.com/sponsors/nakita628"
 
 [build-system]
 requires = ["maturin>=1.8,<2"]

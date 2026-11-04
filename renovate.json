@@ -6,81 +6,81 @@
     "security:openssf-scorecard"
   ],
   "timezone": "Asia/Tokyo",
-  "schedule": [
-    "* * * * 6"
-  ],
+  "schedule": ["* * * * 6"],
+  "labels": ["dependencies"],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
   "dependencyDashboardAutoclose": true,
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
-    "minimumReleaseAge": "1 day"
+    "minimumReleaseAge": "1 day",
+    "labels": ["dependencies", "security"]
   },
   "platformAutomerge": false,
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true,
-    "schedule": [
-      "* * * * 6"
-    ]
+    "schedule": ["* * * * 6"]
   },
   "packageRules": [
     {
-      "matchDatasources": [
-        "github-tags",
-        "github-releases",
-        "crate",
-        "pypi"
-      ],
-      "minimumReleaseAge": "7 days"
+      "description": ".python-version is the lowest supported Python (requires-python >=3.12); CI's matrix covers the newer ones.",
+      "matchManagers": ["pyenv"],
+      "enabled": false
     },
     {
-      "description": "Keep the version ranges in Cargo.toml and pyproject.toml (the published sdist builds with them) and move only the lockfiles.",
-      "matchManagers": [
-        "cargo",
-        "pep621"
-      ],
+      "description": "Dev tools and the pyo3 range: keep the ranges, move only uv.lock / Cargo.lock.",
+      "matchManagers": ["cargo", "pep621"],
       "rangeStrategy": "update-lockfile"
     },
     {
-      "matchManagers": [
-        "github-actions"
-      ],
+      "description": "These ranges ship in the published wheel/sdist metadata: only widen them when a release falls outside, never raise the floor for users.",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["project.dependencies", "build-system.requires"],
+      "rangeStrategy": "widen"
+    },
+    {
+      "matchManagers": ["github-actions"],
       "groupName": "GitHub Actions"
     },
     {
-      "matchManagers": [
-        "cargo"
-      ],
-      "groupName": "Rust crates"
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["dependency-groups"],
+      "groupName": "Python dev tools"
     },
     {
-      "matchManagers": [
-        "pep621"
-      ],
-      "groupName": "Python dev dependencies"
+      "description": "pyo3 and pyo3-build-config must move together.",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["pyo3", "pyo3-build-config"],
+      "groupName": "PyO3"
     },
     {
-      "matchUpdateTypes": [
-        "pin",
-        "pinDigest"
-      ],
+      "description": "maturin is both the build backend of takibiapi and a dev tool: one PR for both ranges.",
+      "matchPackageNames": ["maturin"],
+      "groupName": "maturin",
+      "rangeStrategy": "widen"
+    },
+    {
+      "description": "CI (lint, pyright, pytest on 3.12-3.14, cargo test) is the gate: Renovate merges once every check is green.",
+      "matchUpdateTypes": ["minor", "patch", "pin", "pinDigest"],
       "automerge": true
     },
     {
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "digest"
-      ],
-      "matchCurrentVersion": "!/^0/",
-      "automerge": true
+      "description": "Changes to the published metadata are reviewed by hand (and need a version bump + CHANGELOG entry to ship).",
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["project.dependencies", "build-system.requires"],
+      "automerge": false
     },
     {
-      "matchManagers": [
-        "github-actions"
-      ],
-      "matchUpdateTypes": [
-        "digest"
-      ],
+      "description": "PyO3 0.x minors are breaking releases.",
+      "matchManagers": ["cargo"],
+      "matchUpdateTypes": ["minor"],
+      "automerge": false
+    },
+    {
+      "description": "A digest change with no new version means a moved tag: look at it before merging.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
       "automerge": false
     }
   ]
