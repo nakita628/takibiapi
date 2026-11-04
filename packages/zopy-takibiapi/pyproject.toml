@@ -24,6 +24,7 @@ dependencies = ["takibiapi>=0.1.0,<0.2", "zopy>=0.1.1"]
 [project.urls]
 Repository = "https://github.com/nakita628/takibiapi"
 Issues = "https://github.com/nakita628/takibiapi/issues"
+Funding = "https://github.com/sponsors/nakita628"
 
 [build-system]
 requires = ["uv_build>=0.8,<0.14"]
