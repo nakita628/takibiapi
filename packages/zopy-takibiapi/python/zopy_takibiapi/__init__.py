@@ -2,8 +2,9 @@
 
     from zopy_takibiapi import Context, Response, TakibiAPI, createRoute, z
 
-Schemas are zopy's (``z.StrictObject`` classes, ``z.string().min(1)``, ...), named for the
-document with ``.openapi("Todo")``. Requests are parsed with them before the handler runs, checks
+Schemas are zopy's (``z.StrictObject`` classes, ``z.string().min(1)``, ...). An object is named for
+the document where it is declared, ``class Todo(OpenAPIObject, openapi="Todo")``, and a field
+carries its metadata, ``z.int().openapi({"example": 1})``. Requests are parsed with them before the handler runs, checks
 included, and responses are encoded with them; every object must reject unknown keys.
 """
 
@@ -26,6 +27,7 @@ from takibiapi import (
     problem,
 )
 from zopy_takibiapi.app import TakibiAPI
+from zopy_takibiapi.object import OpenAPIObject
 from zopy_takibiapi.problems import ValidationErrorItem, ValidationProblem
 from zopy_takibiapi.schemas import ZopySchemas
 
@@ -34,6 +36,7 @@ __all__ = [
     "Middleware",
     "Next",
     "OpenAPIConfig",
+    "OpenAPIObject",
     "Request",
     "RequestConfig",
     "Response",

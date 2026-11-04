@@ -3,7 +3,7 @@
 
 from typing import reveal_type
 
-from zopy_takibiapi import Context, TakibiAPI, createRoute, z
+from zopy_takibiapi import Context, OpenAPIObject, TakibiAPI, createRoute, z
 
 
 class TodoParams(z.StrictObject):
@@ -14,12 +14,9 @@ class NewTodo(z.StrictObject):
     title = z.string().min(1)
 
 
-class Todo(z.StrictObject):
+class Todo(OpenAPIObject, openapi="Todo"):
     id = z.int()
     title = z.string()
-
-
-TodoSchema = Todo.openapi("Todo")
 
 
 class Problem(z.StrictObject):
@@ -33,7 +30,7 @@ class putTodoRoute(
             "path": "/todos/{todoId}",
             "request": {"params": TodoParams, "body": {"content": {"application/json": {"schema": NewTodo}}}},
             "responses": {
-                200: {"description": "ok", "content": {"application/json": {"schema": TodoSchema}}},
+                200: {"description": "ok", "content": {"application/json": {"schema": Todo}}},
                 404: {"description": "missing", "content": {"application/json": {"schema": Problem}}},
             },
         }
@@ -58,7 +55,7 @@ class listTodosRoute(
         {
             "method": "get",
             "path": "/todos",
-            "responses": {200: {"description": "ok", "content": {"application/json": {"schema": z.array(TodoSchema)}}}},
+            "responses": {200: {"description": "ok", "content": {"application/json": {"schema": z.array(Todo)}}}},
         }
     )
 ):

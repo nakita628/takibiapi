@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 import takibiapi
-from zopy_takibiapi import Context, ResponseValidationError, TakibiAPI, createRoute, z
+from zopy_takibiapi import Context, OpenAPIObject, ResponseValidationError, TakibiAPI, createRoute, z
 
 
 def iso8601(value: dt.datetime) -> str:
@@ -18,14 +18,11 @@ def iso8601(value: dt.datetime) -> str:
 IsoDateTime = z.codec(z.iso.datetime(), z.date(), decode=dt.datetime.fromisoformat, encode=iso8601)
 
 
-class Todo(z.StrictObject):
+class Todo(OpenAPIObject, openapi="Todo"):
     id = z.int().positive().openapi({"example": 1})
     title = z.string().min(1).max(20).openapi({"example": "Buy milk"})
     completed = z.boolean()
     createdAt = IsoDateTime
-
-
-TodoSchema = Todo.openapi("Todo")
 
 
 class NewTodo(z.StrictObject):
@@ -33,7 +30,7 @@ class NewTodo(z.StrictObject):
     tags = z.array(z.string()).max(3).optional()
 
 
-NewTodoSchema = NewTodo.openapi("NewTodo")
+NewTodoSchema = NewTodo.openapi("NewTodo")  # zopy's own way of naming still works next to openapi=
 
 
 class TodoIdParams(z.StrictObject):
@@ -61,7 +58,7 @@ class getTodoRoute(
             "path": "/todos/{todoId}",
             "request": {"params": TodoIdParams},
             "responses": {
-                200: {"description": "The todo", "content": {"application/json": {"schema": TodoSchema}}},
+                200: {"description": "The todo", "content": {"application/json": {"schema": Todo}}},
                 404: {"description": "Not found", "content": {"application/json": {"schema": NotFound}}},
             },
         }
@@ -76,9 +73,7 @@ class listTodosRoute(
             "method": "get",
             "path": "/todos",
             "request": {"query": ListQuery},
-            "responses": {
-                200: {"description": "Todos", "content": {"application/json": {"schema": z.array(TodoSchema)}}}
-            },
+            "responses": {200: {"description": "Todos", "content": {"application/json": {"schema": z.array(Todo)}}}},
         }
     )
 ):
@@ -94,7 +89,7 @@ class postTodosRoute(
                 "headers": AuthHeaders,
                 "body": {"content": {"application/json": {"schema": NewTodoSchema}}, "required": True},
             },
-            "responses": {201: {"description": "Created", "content": {"application/json": {"schema": TodoSchema}}}},
+            "responses": {201: {"description": "Created", "content": {"application/json": {"schema": Todo}}}},
         }
     )
 ):
@@ -106,7 +101,7 @@ class getBrokenRoute(
         {
             "method": "get",
             "path": "/broken",
-            "responses": {200: {"description": "", "content": {"application/json": {"schema": TodoSchema}}}},
+            "responses": {200: {"description": "", "content": {"application/json": {"schema": Todo}}}},
         }
     )
 ):
@@ -253,7 +248,7 @@ def test_document() -> None:
         }
     ]
     assert set(get["responses"]) == {"200", "404", "422"}
-    # Only the .openapi("Name") schemas are components; NotFound is written in place.
+    # Only the named schemas are components (openapi="Todo", .openapi("NewTodo")); NotFound is written in place.
     assert set(doc["components"]["schemas"]) == {"Todo", "NewTodo", "ValidationProblem", "ValidationErrorItem"}
     assert get["responses"]["200"]["content"]["application/json"]["schema"] == {"$ref": "#/components/schemas/Todo"}
     assert get["responses"]["404"]["content"]["application/json"]["schema"]["properties"] == {

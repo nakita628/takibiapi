@@ -9,14 +9,11 @@ pip install zopy-takibiapi
 ## Quick start
 
 ```python
-from zopy_takibiapi import Context, TakibiAPI, createRoute, z
+from zopy_takibiapi import Context, OpenAPIObject, TakibiAPI, createRoute, z
 
 
-class Message(z.StrictObject):
-    message = z.string()
-
-
-MessageSchema = Message.openapi("Message")  # components.schemas.Message, referenced with $ref
+class Message(OpenAPIObject, openapi="Message"):  # components.schemas.Message, referenced with $ref
+    message = z.string().openapi({"example": "takibi🔥"})
 
 
 class getTakibiRoute(
@@ -24,7 +21,7 @@ class getTakibiRoute(
         {
             "method": "get",
             "path": "/takibi",
-            "responses": {200: {"description": "takibi🔥", "content": {"application/json": {"schema": MessageSchema}}}},
+            "responses": {200: {"description": "takibi🔥", "content": {"application/json": {"schema": Message}}}},
         }
     )
 ):
@@ -45,11 +42,11 @@ granian --interface rsgi myapp:app   # or: uvicorn myapp:app
 curl localhost:8000/takibi           # {"message":"takibi🔥"}
 ```
 
-Import `TakibiAPI` and `z` from `zopy_takibiapi`; everything else works as in Takibi.
+Import `TakibiAPI`, `OpenAPIObject` and `z` from `zopy_takibiapi`; everything else works as in Takibi.
 
 ## Schemas
 
-Every object, nested ones included, must be `z.StrictObject`; `app.openapi` raises `TypeError` for a loose object or a non-zopy schema. Parameters arrive as text and are parsed as Zod parses them, so convert explicitly: `todoId = z.coerce.number().int()`.
+Every object, nested ones included, must be `z.StrictObject` (or `OpenAPIObject`, which is one); `app.openapi` raises `TypeError` for a loose object or a non-zopy schema. Parameters arrive as text and are parsed as Zod parses them, so convert explicitly: `todoId = z.coerce.number().int()`.
 
 ## Checks
 
@@ -62,7 +59,21 @@ app.onError(lambda c: c.json({"error": str(c.error)}, 500))  # replaces the 500,
 
 ## OpenAPI
 
-As in Zod, only `.openapi("Name")` schemas become components; others are written in place. Documents come from zopy's `toJSONSchema` (`openapi-3.0` or JSON Schema 2020-12).
+The OpenAPI metadata is written with the schema, as in `@hono/zod-openapi`:
+
+```python
+class Todo(OpenAPIObject, openapi="Todo"):  # z.object({...}).openapi("Todo")
+    id = z.int().positive().openapi({"example": 1})
+    title = z.string().openapi({"description": "What to do"})
+
+
+class Tag(OpenAPIObject, openapi={"id": "Tag", "description": "A label"}):  # a name and metadata
+    name = z.string()
+```
+
+`OpenAPIObject` is a `z.StrictObject` whose class keyword `openapi=` names it: the class itself becomes `components.schemas.Todo`, referenced with `$ref` wherever it is used, so one name serves as the route's schema and as the type the handler returns (`c.json(Todo(...))`). A mapping without `"id"` adds metadata only, and a subclass is unnamed until it says otherwise. zopy's `Todo.openapi("Todo")` still works, but names a copy of the class.
+
+As in Zod, only named schemas become components; others are written in place. Documents come from zopy's `toJSONSchema` (`openapi-3.0` or JSON Schema 2020-12).
 
 ## Development
 

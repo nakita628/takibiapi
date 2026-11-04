@@ -4,8 +4,9 @@ Requests are parsed with the route's schemas exactly as Zod parses: checks inclu
 conversion unless the schema asks for it (``z.coerce.number()`` for a numeric path parameter), and
 no unknown keys (every object must be ``z.StrictObject``). Responses are encoded with the schema
 the route declares for the status (``safeEncode``: checked, and codecs turned into their wire
-form) before they are written. As in Zod, ``.openapi("Todo")`` names a schema: it is written once to
-``components.schemas`` and referenced with ``$ref``; other schemas are written in place.
+form) before they are written. As in Zod, a named schema (``class Todo(OpenAPIObject, openapi="Todo")``,
+or ``.openapi("Todo")``) is written once to ``components.schemas`` and referenced with ``$ref``;
+other schemas are written in place.
 """
 
 from __future__ import annotations
@@ -126,7 +127,7 @@ class _Encoder:
 
 
 class _DocBuilder:
-    """Schemas as zopy's ``toJSONSchema`` writes them, named ones (``.openapi("Todo")``) collected
+    """Schemas as zopy's ``toJSONSchema`` writes them, named ones (``openapi="Todo"``) collected
     into ``components``. Bodies are documented in their wire form (``io: "input"``, a codec's JSON
     side) both ways: requests are parsed from it and responses encoded into it."""
 
@@ -147,7 +148,7 @@ class _DocBuilder:
             for name, schema in out.pop(key, {}).items():
                 known = self.components.setdefault(name, schema)
                 if known != schema:
-                    raise TypeError(f"two different schemas are named {name!r} (.openapi({name!r}))")
+                    raise TypeError(f"two different schemas are named {name!r}")
         return out
 
     def parameters(self, tp: Any, location: str) -> list[dict[str, Any]]:
