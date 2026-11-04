@@ -1,5 +1,7 @@
 # TakibiAPI
 
+[![Sponsor](https://img.shields.io/github/sponsors/nakita628?label=Sponsor&logo=GitHub)](https://github.com/sponsors/nakita628)
+
 REST APIs for Python whose OpenAPI document, request checks and handler types come from one route declaration.
 
 | Package | |
@@ -59,6 +61,10 @@ uv run just check  # lint, type-check and test, as CI does
 ```
 
 To release a package, bump its version and add a `## <version>` entry to its `CHANGELOG.md`, then push to `main`.
+
+## Sponsor
+
+If TakibiAPI helps you, please consider [sponsoring its development](https://github.com/sponsors/nakita628).
 
 ## License
 
