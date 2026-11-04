@@ -1,6 +1,6 @@
 [project]
 name = "pydantic-takibiapi"
-version = "0.1.0"
+version = "0.1.1"
 description = "takibiapi with pydantic models as the schemas, checked strictly"
 readme = "README.md"
 requires-python = ">=3.12"

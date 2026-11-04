@@ -215,7 +215,7 @@ wheels = [
 
 [[package]]
 name = "pydantic-takibiapi"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/pydantic-takibiapi" }
 dependencies = [
     { name = "pydantic" },
@@ -317,7 +317,7 @@ wheels = [
 
 [[package]]
 name = "takibi-swagger-ui"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/takibi-swagger-ui" }
 dependencies = [
     { name = "takibiapi" },
@@ -328,7 +328,7 @@ requires-dist = [{ name = "takibiapi", editable = "packages/takibiapi" }]
 
 [[package]]
 name = "takibiapi"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/takibiapi" }
 
 [[package]]
@@ -437,7 +437,7 @@ wheels = [
 
 [[package]]
 name = "zopy-takibiapi"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "packages/zopy-takibiapi" }
 dependencies = [
     { name = "takibiapi" },

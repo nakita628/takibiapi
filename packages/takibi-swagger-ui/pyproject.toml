@@ -1,6 +1,6 @@
 [project]
 name = "takibi-swagger-ui"
-version = "0.1.0"
+version = "0.1.1"
 description = "Swagger UI middleware for a takibiapi app"
 readme = "README.md"
 requires-python = ">=3.12"

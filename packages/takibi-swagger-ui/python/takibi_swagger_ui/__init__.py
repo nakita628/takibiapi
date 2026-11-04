@@ -159,4 +159,4 @@ def swaggerUI(options: SwaggerUIOptions) -> Middleware:  # noqa: N802
 
 
 __all__ = ["Asset", "SwaggerUI", "SwaggerUIOptions", "remote_assets", "render_options", "swaggerUI"]
-__version__ = "0.1.0"
+__version__ = "0.1.1"
