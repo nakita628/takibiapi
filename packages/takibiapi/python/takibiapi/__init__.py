@@ -10,10 +10,10 @@ serves the OpenAPI document. Request parts are checked against their types only 
 """
 
 from takibiapi.app import Fallback, FallbackHandler, FallbackMiddleware, FallbackNext, Middleware, Next, TakibiAPI
-from takibiapi.context import Context, Request, Response, ResponseValidationError, problem
+from takibiapi.context import Context, Request, Response, ResponseValidationError, TypedResponse, problem
 from takibiapi.openapi import OpenAPIConfig
 from takibiapi.problems import ValidationProblem
-from takibiapi.route import RequestConfig, ResponseConfig, Route, RouteConfig, createRoute
+from takibiapi.route import RequestConfig, ResponseConfig, Route, RouteConfig, StatusCode, createRoute
 from takibiapi.schema import ValidationError
 
 __all__ = [
@@ -32,7 +32,9 @@ __all__ = [
     "ResponseValidationError",
     "Route",
     "RouteConfig",
+    "StatusCode",
     "TakibiAPI",
+    "TypedResponse",
     "ValidationError",
     "ValidationProblem",
     "createRoute",

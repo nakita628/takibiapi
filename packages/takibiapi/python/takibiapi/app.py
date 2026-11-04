@@ -14,7 +14,7 @@ import typing
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any, Self, TypeVar, get_args, get_origin
 
-from .context import Context, MalformedJSONError, RawHeaders, Request, Response, problem
+from .context import Context, MalformedJSONError, RawHeaders, Request, Response, TypedResponse, problem
 from .openapi import OpenAPIConfig, build_document, check_config
 from .route import AnyRoute, route_class
 from .router import new_router
@@ -90,11 +90,15 @@ class TakibiAPI:
         self._documents: dict[int, bytes] = {}
 
     # -- routes ------------------------------------------------------------------------------- #
-    def openapi(self, route: type[_TR], handler: Callable[[Context[_TR]], Response | Awaitable[Response]]) -> Self:
+    def openapi(
+        self, route: type[_TR], handler: Callable[[Context[_TR]], TypedResponse | Awaitable[TypedResponse]]
+    ) -> Self:
         """Register ``route`` with its handler.
 
         The route must be declared as a class (``class getTodoRoute(createRoute({...}))``) and
         the handler must take it as ``c: Context[getTodoRoute]``; anything else is a ``TypeError``.
+        For the type checker, the handler returns what ``c.json`` / ``c.text`` / ``c.body`` build,
+        with a status the route declares.
         The request parts the route declares are checked against their types before the handler
         runs (422 when they do not match) and read with ``c.req.valid(...)``.
         """
