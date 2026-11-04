@@ -1,0 +1,19 @@
+[package]
+name = "takibiapi"
+description = "Rust engine (takibiapi._core) behind the takibiapi Python package: request type checks, JSON, routing"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "_core"
+# cdylib: the Python extension module; rlib: lets `cargo test` run pure-Rust unit tests.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3.workspace = true
+
+[build-dependencies]
+pyo3-build-config.workspace = true

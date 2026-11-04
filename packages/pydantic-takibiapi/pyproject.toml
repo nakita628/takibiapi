@@ -1,0 +1,37 @@
+[project]
+name = "pydantic-takibiapi"
+version = "0.1.0"
+description = "takibiapi with pydantic models as the schemas, checked strictly"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "nakita628" }]
+keywords = ["openapi", "asgi", "pydantic", "rest", "api", "validation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Typing :: Typed",
+]
+dependencies = ["takibiapi>=0.1.0,<0.2", "pydantic>=2.11"]
+
+[project.urls]
+Repository = "https://github.com/nakita628/takibiapi"
+Issues = "https://github.com/nakita628/takibiapi/issues"
+
+[build-system]
+requires = ["uv_build>=0.8,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = "python"
+module-name = "pydantic_takibiapi"
+
+[tool.uv.sources]
+takibiapi = { workspace = true }

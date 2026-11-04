@@ -1,0 +1,102 @@
+# uv workspace root (not a package itself). `uv sync` installs every package under packages/
+# editable, the Rust extension of takibiapi included (maturin builds it).
+[project]
+name = "takibiapi-workspace"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = ["takibiapi", "pydantic-takibiapi", "zopy-takibiapi", "takibi-swagger-ui"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+takibiapi = { workspace = true }
+pydantic-takibiapi = { workspace = true }
+zopy-takibiapi = { workspace = true }
+takibi-swagger-ui = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "actionlint-py>=1.7.12.25",
+    "maturin>=1.8,<2",
+    "pyright>=1.1.400",
+    "pytest>=8.3",
+    "ruff>=0.12",
+    "rust-just>=1.59.0",
+    "zizmor>=1.31.1",
+]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["target"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "A",    # flake8-builtins
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "PIE",  # flake8-pie
+    "PT",   # flake8-pytest-style
+    "PERF", # perflint
+    "FURB", # refurb
+    "PGH",  # pygrep-hooks (blanket noqa / type: ignore)
+    "ISC",  # implicit string concatenation
+    "PYI",  # stub files (_core.pyi)
+    "T20",  # print
+    "RUF",  # ruff-specific
+]
+ignore = [
+    # PEP 695 generics (class X[T]): the route types use explicit TypeVars on purpose (a covariant
+    # response type with ReadOnly fields, overload-scoped variables), which the new syntax changes.
+    "UP046",
+    "UP047",
+    # Schema fields are JSON keys (todoId, createdAt), so camelCase in class bodies is intended.
+    "N815",
+    # The stub documents the Rust engine's functions; the docstrings are wanted there.
+    "PYI021",
+]
+# Not selected: TC (type-checking blocks). Route and schema annotations are evaluated at run time
+# (get_type_hints), so an import that looks typing-only may be needed when the module runs.
+
+[tool.ruff.lint.flake8-builtins]
+# Middleware is `async def mw(c, next)`, as in Hono.
+builtins-ignorelist = ["next"]
+
+[tool.ruff.lint.per-file-ignores]
+# Routes and handlers are named like operationIds (getTodoRoute, getTodoRouteHandler).
+"packages/*/tests/**" = ["N801", "N802"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["takibiapi", "pydantic_takibiapi", "zopy_takibiapi", "takibi_swagger_ui"]
+
+# ---------------------------------------------------------------- pyright
+[tool.pyright]
+include = ["packages"]
+exclude = ["**/__pycache__", "**/.venv", "target", "**/dist"]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+# importlib mode: the packages' test files share names (test_app.py, test_typing.py).
+addopts = ["--strict-markers", "--strict-config", "--import-mode=importlib"]
+testpaths = [
+    "packages/takibiapi/tests",
+    "packages/pydantic-takibiapi/tests",
+    "packages/zopy-takibiapi/tests",
+    "packages/takibi-swagger-ui/tests",
+]

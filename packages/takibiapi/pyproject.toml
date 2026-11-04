@@ -1,0 +1,36 @@
+[project]
+name = "takibiapi"
+version = "0.1.0"
+description = "REST APIs whose OpenAPI document, request checks and handler types come from Python's own types"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "nakita628" }]
+keywords = ["openapi", "asgi", "rsgi", "rest", "api", "typing", "dataclasses", "typeddict"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/nakita628/takibiapi"
+Issues = "https://github.com/nakita628/takibiapi/issues"
+
+[build-system]
+requires = ["maturin>=1.8,<2"]
+build-backend = "maturin"
+
+[tool.maturin]
+python-source = "python"
+module-name = "takibiapi._core"
+features = ["pyo3/extension-module"]

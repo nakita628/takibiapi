@@ -1,0 +1,290 @@
+# Releases every package of the workspace whose version (packages/<name>/pyproject.toml) is not on
+# PyPI yet, once CI has passed on main. `plan` reads
+# the versions, asks PyPI, and checks that each package's CHANGELOG.md (the format of
+# changesets; it is the release note, there is no GitHub release)
+# has the entry; then the commit is tagged `<directory>-v<version>` per package, the distributions
+# are built, and published with trusted publishing (OIDC, no token). Every step skips what is
+# already done, so a run that failed part-way is finished by re-running its failed jobs. A manual
+# run builds the chosen package(s) from the current ref and publishes them to TestPyPI only.
+#
+# The packages are the list in `plan` (`<directory>:<rust>`), with the version in pyproject.toml: a
+# package with a Rust extension gets platform wheels from maturin for every interpreter listed below,
+# and a pure-Python package one wheel and the sdist from `uv build`. The jobs are matrices over that
+# plan, so the publish jobs wait for every tag and every build: a package that fails to build holds
+# the others back until the failed jobs are re-run, or the problem is fixed and pushed.
+#
+# `workflow_run` is the trigger zizmor warns about because it hands a token to code from a pull
+# request when misused; `plan` checks out the commit CI ran on (`head_sha`), only for a `push` to
+# main, and only the tag and publish jobs can write, through the API.
+name: Release
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers]
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to build and publish to TestPyPI
+        type: choice
+        default: all
+        options:
+          - all
+          - takibiapi
+          - pydantic-takibiapi
+          - zopy-takibiapi
+          - takibi-swagger-ui
+
+permissions: {}
+
+concurrency:
+  group: release
+
+env:
+  INTERPRETERS: python3.12 python3.13 python3.14
+
+jobs:
+  plan:
+    name: Plan the release
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.plan.outputs.sha }}
+      packages: ${{ steps.plan.outputs.packages }}
+      builds: ${{ steps.plan.outputs.builds }}
+      pypi: ${{ steps.plan.outputs.pypi }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - name: Read the versions, ask the registries, check the changelogs
+        id: plan
+        env:
+          # The packages: <directory>:<rust>, one per line. A new package is a new line here (and
+          # in the dispatch choices above); a line starting with `#` is left out of the release.
+          PACKAGES: |
+            takibiapi:true
+            pydantic-takibiapi:false
+            zopy-takibiapi:false
+            takibi-swagger-ui:false
+          CHOSEN: ${{ inputs.package || 'all' }}
+        run: |
+          set -euo pipefail
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          DISPATCH=false
+          [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && DISPATCH=true
+          WHEELS='[
+            {"name": "wheels-linux-x86_64",  "runner": "ubuntu-latest",    "kind": "wheel", "target": "x86_64"},
+            {"name": "wheels-linux-aarch64", "runner": "ubuntu-24.04-arm", "kind": "wheel", "target": "aarch64"},
+            {"name": "wheels-macos-x86_64",  "runner": "macos-15-intel",   "kind": "wheel", "target": "x86_64"},
+            {"name": "wheels-macos-aarch64", "runner": "macos-14",         "kind": "wheel", "target": "aarch64"},
+            {"name": "wheels-windows-x64",   "runner": "windows-latest",   "kind": "wheel", "target": "x64"},
+            {"name": "sdist",                "runner": "ubuntu-latest",    "kind": "sdist", "target": ""}
+          ]'
+          PLANNED='[]'
+          FAILED=false
+          while read -r SPEC; do
+            case "$SPEC" in '' | '#'*) continue ;; esac
+            IFS=: read -r PACKAGE RUST <<< "$SPEC"
+            if [ "$CHOSEN" != "all" ] && [ "$CHOSEN" != "$PACKAGE" ]; then
+              continue
+            fi
+            DIR="packages/$PACKAGE"
+            NAME="$PACKAGE"
+            VERSION=$(python3 -c 'import sys, tomllib; print(tomllib.load(open(f"{sys.argv[1]}/pyproject.toml", "rb"))["project"]["version"])' "$DIR")
+            STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/$NAME/$VERSION/json")
+            case "$STATUS" in
+              200) UNPUBLISHED=false ;;
+              404) UNPUBLISHED=true ;;
+              *)
+                echo "::error::PyPI answered $STATUS for $NAME $VERSION. Check https://status.python.org/ and re-run the workflow"
+                FAILED=true
+                continue
+                ;;
+            esac
+            # The release note is the package's CHANGELOG.md: a version without an entry is not released.
+            if ! grep -qx "## $VERSION" "$DIR/CHANGELOG.md"; then
+              echo "::error file=$DIR/CHANGELOG.md::$NAME $VERSION has no '## $VERSION' entry in $DIR/CHANGELOG.md. Add one, then push again"
+              FAILED=true
+              continue
+            fi
+            echo "$DIR: $NAME $VERSION, unpublished=$UNPUBLISHED"
+            PLANNED=$(jq -c --arg package "$PACKAGE" --arg name "$NAME" --arg version "$VERSION" \
+              --argjson unpublished "$UNPUBLISHED" --argjson rust "$RUST" \
+              '. + [{package: $package, name: $name, version: $version, unpublished: $unpublished, rust: $rust}]' <<< "$PLANNED")
+          done <<< "$PACKAGES"
+          if [ "$FAILED" = "true" ]; then
+            exit 1
+          fi
+          # What each job takes: the build matrix (one entry per distribution), and the packages each publish job releases.
+          BUILDS=$(jq -c --argjson dispatch "$DISPATCH" --argjson wheels "$WHEELS" '
+            [ .[] | select($dispatch or .unpublished) | . as $p
+              | (if .rust then $wheels
+                 else [{name: "dist", runner: "ubuntu-latest", kind: "pure", target: ""}] end)[]
+              | {package: $p.package, name, runner, kind, target} ]' <<< "$PLANNED")
+          PYPI=$(jq -c --argjson dispatch "$DISPATCH" '[ .[] | select($dispatch or .unpublished) ]' <<< "$PLANNED")
+          {
+            echo "packages=$PLANNED"
+            echo "builds=$BUILDS"
+            echo "pypi=$PYPI"
+          } >> "$GITHUB_OUTPUT"
+          echo "builds: $(jq -r '[.[] | "\(.package)/\(.name)"] | join(", ")' <<< "$BUILDS")"
+
+  tag:
+    name: Tag ${{ matrix.package }}
+    needs: plan
+    if: github.event_name == 'workflow_run' && needs.plan.outputs.packages != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.packages) }}
+    steps:
+      - name: Create or verify tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE: ${{ matrix.package }}
+          NAME: ${{ matrix.name }}
+          VERSION: ${{ matrix.version }}
+          UNPUBLISHED: ${{ matrix.unpublished }}
+          HEAD_SHA: ${{ needs.plan.outputs.sha }}
+        run: |
+          set -euo pipefail
+          TAG="$PACKAGE-v$VERSION"
+          if ! TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha 2>/dev/null); then
+            if [ "$UNPUBLISHED" = "false" ]; then
+              echo "::error::$NAME $VERSION is already published, but tag $TAG does not exist. Tag the commit that was published (git tag $TAG <sha> && git push origin $TAG), or bump the version and push again"
+              exit 1
+            fi
+            gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$TAG" -f sha="$HEAD_SHA" >/dev/null
+            echo "created tag $TAG at $HEAD_SHA"
+            exit 0
+          fi
+          if [ "$TAG_SHA" = "$HEAD_SHA" ]; then
+            echo "tag $TAG already points to $HEAD_SHA; skip"
+            exit 0
+          fi
+          if [ "$UNPUBLISHED" = "false" ]; then
+            echo "$NAME $VERSION is published and $TAG points to $TAG_SHA; nothing to do for $HEAD_SHA"
+            exit 0
+          fi
+          # Not published, and tagged on an earlier commit of main: a run that tagged and then failed
+          # to publish. Nothing went out under the tag, so it moves to the commit this run publishes.
+          STATUS=$(gh api "repos/$GITHUB_REPOSITORY/compare/$TAG_SHA...$HEAD_SHA" --jq .status)
+          if [ "$STATUS" = "ahead" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$TAG" -f sha="$HEAD_SHA" -F force=true >/dev/null
+            echo "moved tag $TAG from $TAG_SHA to $HEAD_SHA: $NAME $VERSION was never published"
+            exit 0
+          fi
+          echo "::error::$TAG already points to another commit ($TAG_SHA, expected $HEAD_SHA), which is not an ancestor of it. Re-run the release workflow for $TAG_SHA, or bump the version of packages/$PACKAGE and push again"
+          exit 1
+
+  build:
+    name: Build ${{ matrix.package }} (${{ matrix.name }})
+    needs: plan
+    if: needs.plan.outputs.builds != '[]'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.builds) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      # Linux wheels are built inside maturin's manylinux container, which carries the interpreters.
+      - if: matrix.kind == 'wheel' && runner.os != 'Linux'
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: |
+            3.12
+            3.13
+            3.14
+      - name: Build the wheels (maturin)
+        if: matrix.kind == 'wheel'
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          working-directory: packages/${{ matrix.package }}
+          target: ${{ matrix.target }}
+          manylinux: auto
+          args: --release --out dist --interpreter ${{ env.INTERPRETERS }}
+      - name: Build the sdist (maturin)
+        if: matrix.kind == 'sdist'
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
+        with:
+          working-directory: packages/${{ matrix.package }}
+          command: sdist
+          args: --out dist
+      - if: matrix.kind == 'pure'
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Build the wheel and the sdist (uv build)
+        if: matrix.kind == 'pure'
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: uv build --package "$PACKAGE" --out-dir "packages/$PACKAGE/dist"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.package }}-${{ matrix.name }}
+          path: packages/${{ matrix.package }}/dist
+          if-no-files-found: error
+
+  publish-testpypi:
+    name: Publish ${{ matrix.package }} to TestPyPI
+    needs: [plan, build]
+    if: github.event_name == 'workflow_dispatch' && needs.plan.outputs.pypi != '[]'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/${{ matrix.package }}
+    permissions:
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.pypi) }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ${{ matrix.package }}-*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  publish-pypi:
+    name: Publish ${{ matrix.package }} to PyPI
+    needs: [plan, tag, build]
+    if: github.event_name == 'workflow_run' && needs.plan.outputs.pypi != '[]'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/${{ matrix.package }}
+    permissions:
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.pypi) }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ${{ matrix.package }}-*
+          path: dist
+          merge-multiple: true
+      # skip-existing: a re-run after a partial upload publishes only the files still missing.
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          skip-existing: true

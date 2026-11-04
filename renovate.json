@@ -1,0 +1,87 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":separateMultipleMajorReleases",
+    "security:openssf-scorecard"
+  ],
+  "timezone": "Asia/Tokyo",
+  "schedule": [
+    "* * * * 6"
+  ],
+  "dependencyDashboardAutoclose": true,
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "minimumReleaseAge": "1 day"
+  },
+  "platformAutomerge": false,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "schedule": [
+      "* * * * 6"
+    ]
+  },
+  "packageRules": [
+    {
+      "matchDatasources": [
+        "github-tags",
+        "github-releases",
+        "crate",
+        "pypi"
+      ],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Keep the version ranges in Cargo.toml and pyproject.toml (the published sdist builds with them) and move only the lockfiles.",
+      "matchManagers": [
+        "cargo",
+        "pep621"
+      ],
+      "rangeStrategy": "update-lockfile"
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "matchManagers": [
+        "cargo"
+      ],
+      "groupName": "Rust crates"
+    },
+    {
+      "matchManagers": [
+        "pep621"
+      ],
+      "groupName": "Python dev dependencies"
+    },
+    {
+      "matchUpdateTypes": [
+        "pin",
+        "pinDigest"
+      ],
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "digest"
+      ],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": true
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "automerge": false
+    }
+  ]
+}

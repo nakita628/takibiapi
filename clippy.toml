@@ -1,0 +1,2 @@
+# Words written without backticks in doc comments (doc_markdown).
+doc-valid-idents = ["OpenAPI", "PyO3", "UTF-8", "JSON", ".."]

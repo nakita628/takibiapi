@@ -1,0 +1,4 @@
+# PyO3 builds against the workspace's interpreter (`uv sync` creates .venv), not whatever `python3`
+# is on PATH. maturin sets PYO3_PYTHON itself, which takes precedence over this default.
+[env]
+PYO3_PYTHON = { value = ".venv/bin/python", relative = true }
