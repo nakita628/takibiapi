@@ -9,6 +9,48 @@ REST APIs for Python whose OpenAPI document, request checks and handler types co
 | [`zopy-takibiapi`](packages/zopy-takibiapi) | With [zopy](https://github.com/nakita628/zopy) schemas. |
 | [`takibi-swagger-ui`](packages/takibi-swagger-ui) | Swagger UI middleware. |
 
+## Quick start
+
+```sh
+pip install zopy-takibiapi
+```
+
+```python
+from zopy_takibiapi import Context, OpenAPIObject, TakibiAPI, createRoute, z
+
+
+class Message(OpenAPIObject, openapi="Message"):
+    message = z.string().openapi({"example": "takibi🔥"})
+
+
+class getTakibiRoute(
+    createRoute(
+        {
+            "method": "get",
+            "path": "/takibi",
+            "responses": {200: {"description": "takibi🔥", "content": {"application/json": {"schema": Message}}}},
+        }
+    )
+):
+    """Say takibi🔥."""
+
+
+def getTakibiRouteHandler(c: Context[getTakibiRoute]):
+    return c.json(Message(message="takibi🔥"), 200)
+
+
+app = TakibiAPI()
+app.openapi(getTakibiRoute, getTakibiRouteHandler)
+app.doc("/doc", {"openapi": "3.0.0", "info": {"title": "takibi API", "version": "1.0.0"}})
+```
+
+```sh
+granian --interface rsgi myapp:app   # or: uvicorn myapp:app
+curl localhost:8000/takibi           # {"message":"takibi🔥"}
+```
+
+See [`zopy-takibiapi`](packages/zopy-takibiapi) for schemas, checks and the OpenAPI document.
+
 ## Development
 
 ```sh
